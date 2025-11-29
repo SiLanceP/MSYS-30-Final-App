@@ -92,19 +92,19 @@ def merge(left, right, key_func):
 def linear_search(data_list, search_term, attribute_func):
     """
     data_list: The list to search through
-    search_term: The string to find (e.g., "T01")
+    search_term: The string to find
     attribute_func: Function to get the string attribute from the item
     """
     results = []
     if not search_term:
         return data_list
 
-    search_term = search_term.lower()
+    search_term = str(search_term).lower()
     
-    # Iterate one by one (O(N))
     for item in data_list:
-        val = attribute_func(item).lower()
-        if search_term in val:
+        # Check if attribute_func returns a value, handle None safely
+        val = attribute_func(item)
+        if val and search_term in str(val).lower():
             results.append(item)
             
     return results
