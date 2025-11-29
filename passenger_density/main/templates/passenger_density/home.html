@@ -1,47 +1,36 @@
-{% load static %}
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LRT-2 Passenger Density</title>
-    
-    <link rel="stylesheet" href="{% static '/bootstrap/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static '/bootstrap/css/custom.css' %}">
-  </head>
-  
-  <body class="bg-light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
     <div class="container mt-5">
-        <div class="card shadow-sm">
-            
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h1 class="h3 mb-0">Passenger Density App</h1>
-                <small class="fw-bold">{{ time }}</small>
-            </div>
-            
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h3 class="border-bottom pb-2">Data Table</h3>
-                        <div class="table-responsive">
-                            {{ table_html|safe }}
-                        </div>
-                    </div>
+        <div class="text-center">
+            <h1>Passenger Density Monitoring</h1>
+            <p class="lead">Select a station to view its status or reports.</p>
+        </div>
 
-                    <div class="col-md-6 text-center">
-                        <h3 class="border-bottom pb-2">Density Graph</h3>
-                        {% if graphic %}
-                            <img src="data:image/png;base64,{{ graphic }}" class="img-fluid border rounded" alt="Graph">
-                        {% else %}
-                            <p class="text-muted mt-5">No graph data found.</p>
-                        {% endif %}
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Select Station</h5>
+                        <div class="input-group mb-3">
+                            <select id="stationSelect" class="form-select">
+                                {% for station in stations %}
+                                    <option value="{{ station.name }}" {% if station.name == default_station %}selected{% endif %}>{{ station.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a id="monitorLink" class="btn btn-primary">Station Monitor</a>
+                            <a id="reportsLink" class="btn btn-secondary">Reports</a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
-  </body>
-</html>

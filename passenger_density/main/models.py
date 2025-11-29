@@ -21,7 +21,7 @@ class Station(models.Model):
         return self.name
 
 class train(models.Model):
-    train_id = models.CharField(max_length=20, unique=True)
+    train_id = models.IntegerField(unique=True)
     max_capacity = models.IntegerField(default=1600) #the max capacity of the lrt2 train (both standing and sitting)
     current_capacity = models.IntegerField(default=0)
     current_station = models.ForeignKey(Station, on_delete=models.SET_NULL, null=True, blank=True)
