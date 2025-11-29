@@ -1,0 +1,47 @@
+{% load static %}
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LRT-2 Passenger Density</title>
+    
+    <link rel="stylesheet" href="{% static '/bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static '/bootstrap/css/custom.css' %}">
+  </head>
+  
+  <body class="bg-light">
+    <div class="container mt-5">
+        <div class="card shadow-sm">
+            
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0">Passenger Density App</h1>
+                <small class="fw-bold">{{ time }}</small>
+            </div>
+            
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h3 class="border-bottom pb-2">Data Table</h3>
+                        <div class="table-responsive">
+                            {{ table_html|safe }}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 text-center">
+                        <h3 class="border-bottom pb-2">Density Graph</h3>
+                        {% if graphic %}
+                            <img src="data:image/png;base64,{{ graphic }}" class="img-fluid border rounded" alt="Graph">
+                        {% else %}
+                            <p class="text-muted mt-5">No graph data found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+  </body>
+</html>
