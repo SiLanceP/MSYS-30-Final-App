@@ -23,6 +23,7 @@ class Queue:
         return self.size == 0
 
     def push(self, train_id):
+        # Adds a train_id to the end of the queue
         newNode = TrainNode(train_id)
         if self.tail is None:
             self.head = newNode
@@ -33,14 +34,20 @@ class Queue:
         self.size += 1
 
     def pop(self):
+        # Removes and returns the train_id from the front of the queue
         if self.is_empty():
             return None
+        
         remove_train_id = self.head.get_train_id()
         self.head = self.head.get_next()
+        
         if self.head is None:
             self.tail = None
         self.size -= 1
         return remove_train_id
+
+    def get_size(self):
+        return self.size
 
     # Helper to display the queue in HTML
     def get_all_items(self):
@@ -52,7 +59,7 @@ class Queue:
         return items
 
 # --- MERGE SORT ALGORITHM (Generic) ---
-# Used for BOTH Daily (sorting logs by count) and Weekly (sorting days by average)
+# Used for reports (sorting logs by High to lowest, lowest to high, by Time)
 def merge_sort(data_list, key_func):
     """
     data_list: The list to sort
@@ -89,11 +96,10 @@ def merge(left, right, key_func):
 
 # --- LINEAR SEARCH ALGORITHM ---
 # Used for searching/filtering specific items in a list
+# used for searching highest and lowest capacity per train 
 def linear_search(data_list, search_term, attribute_func):
     """
-    data_list: The list to search through
-    search_term: The string to find
-    attribute_func: Function to get the string attribute from the item
+    used to find train in the home page
     """
     results = []
     if not search_term:
