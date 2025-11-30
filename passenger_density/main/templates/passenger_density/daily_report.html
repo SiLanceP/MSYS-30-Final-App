@@ -98,8 +98,8 @@
           <ul class="mb-2">
             {% for log in item.logs %}
               <li>
-                {{ log.timestamp|date:"g:i A" }} –
-                {{ log.capacity_level|capfirst }} ({{ log.passenger_count }} passengers)
+                {{ log.timestamp|date:"g:i:s A" }} –
+                {{ log.capacity_level|capfirst }} ({{ log.passenger_count }} passengers, {{ log.station.name }})
               </li>
             {% endfor %}
           </ul>
@@ -172,7 +172,7 @@
                 <td>{{ item.max_capacity }}</td>
                 <td>
                 {% for log in item.logs %}
-                    {{ log.timestamp|date:"g:i A" }} ({{ log.station.name }}, {{ log.capacity_level|capfirst }}){% if not forloop.last %}; {% endif %}
+                    {{ log.timestamp|date:"g:i:s A" }} ({{ log.station.name }}, {{ log.capacity_level|capfirst }}){% if not forloop.last %}; {% endif %}
                 {% endfor %}
                 </td>
             </tr>
@@ -200,7 +200,7 @@
                 <td>{{ item.min_capacity }}</td>
                 <td>
                 {% for log in item.logs %}
-                    {{ log.timestamp|date:"g:i A" }} ({{ log.station.name }}, {{ log.capacity_level|capfirst }}){% if not forloop.last %}; {% endif %}
+                    {{ log.timestamp|date:"g:i:s A" }} ({{ log.station.name }}, {{ log.capacity_level|capfirst }}){% if not forloop.last %}; {% endif %}
                 {% endfor %}
                 </td>
             </tr>

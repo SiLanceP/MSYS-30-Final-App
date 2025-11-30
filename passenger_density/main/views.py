@@ -174,9 +174,9 @@ def _build_daily_report_data(target_date):
     train_ids = sorted({log.train.train_id for log in logs})
     trains = list(Train.objects.filter(train_id__in=train_ids).order_by("train_id"))
 
-    # Time slots 6:00–18:00
-    start_hour = 6
-    end_hour = 18
+    # Time slots 4:00–22:00
+    start_hour = 4
+    end_hour = 22
     hours = list(range(start_hour, end_hour + 1))
 
     # grid[hour][train_id] = 'low' / 'medium' / 'high' / ''
