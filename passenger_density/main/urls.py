@@ -20,6 +20,12 @@ from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', views.home, name='home'),
-    
+    path("", views.home, name="home"),
+    path("advance/", views.advance_trains, name="advance_trains"),
+    path("reset/", views.reset_trains_to_start, name="reset_trains_to_start"),
+    path("train/<int:train_id>/capacity/", views.update_capacity, name="update_capacity"),
+    path("report/daily/", views.daily_density_report, name="daily_density_report"),
+    path("report/daily/excel/", views.daily_density_report_excel, name="daily_density_report_excel"),
+    path("report/daily/clear/", views.clear_daily_report, name="clear_daily_report"),
+    path("snapshot/", views.snapshot_all_trains, name="snapshot_all_trains"),
 ]

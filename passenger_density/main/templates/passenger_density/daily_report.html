@@ -1,0 +1,161 @@
+{% load static %}
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Daily density report</title>
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+  </head>
+  <body class="bg-light">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Daily density report – {{ target_date }}</h2>
+        <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-success"
+                href="{% url 'daily_density_report_excel' %}?date={{ target_date|date:'Y-m-d' }}">
+                Download Excel
+            </a>
+
+            <form method="post"
+                action="{% url 'clear_daily_report' %}"
+                onsubmit="return confirm('Clear all logs for this date? This cannot be undone.');">
+            {% csrf_token %}
+            <input type="hidden" name="date" value="{{ target_date|date:'Y-m-d' }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    Clear this day
+                </button>
+            </form>
+
+            <a class = "btn btn-sm btn-secondary"
+                href="{% url 'home' %}">
+                Back to home
+            </a>
+        </div>
+    </div>
+
+      <form method="get" class="row g-2 align-items-center mb-3">
+        <div class="col-auto">
+          <label for="dateInput" class="col-form-label">Date:</label>
+        </div>
+        <div class="col-auto">
+          <input id="dateInput"
+                 type="date"
+                 name="date"
+                 value="{{ target_date|date:'Y-m-d' }}"
+                 class="form-control form-control-sm">
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-sm btn-primary">Go</button>
+        </div>
+      </form>
+
+      <!-- Spreadsheet-like grid -->
+      <div class="table-responsive mb-4">
+        <table class="table table-sm table-bordered align-middle">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">Time</th>
+              {% for t in trains %}
+                <th scope="col">Train {{ t.train_id }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>{{ row.label }}</td>
+                {% for cell in row.cells %}
+                  <td>{{ cell }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Per-train events sorted from high -> low -->
+      <h4>Density events per train (sorted High → Low)</h4>
+
+        <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Sort density events">
+            <a class="btn btn-outline-primary {% if sort_mode == 'time' %}active{% endif %}"
+                href="{% url 'daily_density_report' %}?date={{ target_date|date:'Y-m-d' }}&sort=time">
+                Sort by time
+            </a>
+            <a class="btn btn-outline-primary {% if sort_mode == 'high' %}active{% endif %}"
+                href="{% url 'daily_density_report' %}?date={{ target_date|date:'Y-m-d' }}&sort=high">
+                Highest → Lowest
+            </a>
+            <a class="btn btn-outline-primary {% if sort_mode == 'low' %}active{% endif %}"
+                href="{% url 'daily_density_report' %}?date={{ target_date|date:'Y-m-d' }}&sort=low">
+                Lowest → Highest
+            </a>
+        </div>
+
+
+      {% if per_train_sorted %}
+        {% for item in per_train_sorted %}
+          <h5 class="mt-3">Train {{ item.train.train_id }}</h5>
+          <ul class="mb-2">
+            {% for log in item.logs %}
+              <li>
+                {{ log.timestamp|date:"g:i A" }} –
+                {{ log.capacity_level|capfirst }} ({{ log.passenger_count }} passengers)
+              </li>
+            {% endfor %}
+          </ul>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted">No logs for this date.</p>
+      {% endif %}
+
+      <!-- Train rankings by number of peaks -->
+      <div class="row mt-4">
+        <div class="col-md-6">
+          <h4>Trains with most HIGH density peaks</h4>
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>Train</th>
+                <th># High peaks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in trains_by_high %}
+                <tr>
+                  <td>Train {{ item.train.train_id }}</td>
+                  <td>{{ item.high_count }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-muted">No data.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="col-md-6">
+          <h4>Trains with most LOW density periods</h4>
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>Train</th>
+                <th># Low periods</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in trains_by_low %}
+                <tr>
+                  <td>Train {{ item.train.train_id }}</td>
+                  <td>{{ item.low_count }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-muted">No data.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+  </body>
+</html>

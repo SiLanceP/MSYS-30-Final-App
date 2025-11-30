@@ -4,44 +4,243 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LRT-2 Passenger Density</title>
-    
-    <link rel="stylesheet" href="{% static '/bootstrap/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static '/bootstrap/css/custom.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap/css/custom.css' %}">
+    <style>
+      /* Horizontal railway map */
+      .railway-map {
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 3rem 0;
+        padding: 0 1rem;
+      }
+
+      /* The main line that runs behind all circles */
+      .railway-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 4px;
+        background-color: #6c757d; /* gray line */
+        z-index: 0;
+      }
+
+      /* Each station node sits on top of the line */
+      .station-node {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 60px;
+      }
+
+      /* Circle on the line */
+      .station-circle {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 4px solid #0d6efd; /* Bootstrap primary */
+        background-color: #ffffff;
+        box-shadow: 0 0 0 2px #ffffff; /* separation from the line */
+      }
+
+      /* Station name under the line */
+      .station-name {
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-align: center;
+      }
+
+      /* Trains displayed as small badges above the line */
+      .train-queue {
+        margin-bottom: 0.75rem;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.25rem;
+      }
+
+      .train-badge {
+        border-radius: 999px;
+        padding: 0.1rem 0.5rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        background-color: #e0e0e0;
+      }
+
+      /* Color by capacity level (uses train.capacity_level: Low / Medium / High) */
+      .train-badge.low {
+        background-color: #28a745;
+        color: #fff;
+      }
+
+      .train-badge.medium {
+        background-color: #ffc107;
+        color: #212529;
+      }
+
+      .train-badge.high {
+        background-color: #dc3545;
+        color: #fff;
+      }
+
+      .no-trains {
+        font-size: 0.7rem;
+      }
+      .train-badge.empty {
+        background-color: #e9ecef;  /* light grey */
+        color: #212529;
+    }
+    </style>
   </head>
-  
   <body class="bg-light">
     <div class="container mt-5">
-        <div class="card shadow-sm">
-            
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h1 class="h3 mb-0">Passenger Density App</h1>
-                <small class="fw-bold">{{ time }}</small>
-            </div>
-            
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h3 class="border-bottom pb-2">Data Table</h3>
-                        <div class="table-responsive">
-                            {{ table_html|safe }}
-                        </div>
-                    </div>
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">Passenger Density - Railway View</h1>
 
-                    <div class="col-md-6 text-center">
-                        <h3 class="border-bottom pb-2">Density Graph</h3>
-                        {% if graphic %}
-                            <img src="data:image/png;base64,{{ graphic }}" class="img-fluid border rounded" alt="Graph">
-                        {% else %}
-                            <p class="text-muted mt-5">No graph data found.</p>
-                        {% endif %}
-                    </div>
-                </div>
+            <!-- Group all buttons together with small gap -->
+            <div class="d-flex align-items-center gap-2">
+                <form method="post" action="{% url 'reset_trains_to_start' %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-light">
+                        Reset to start
+                    </button>
+                </form>
+
+                <form method="post" action="{% url 'advance_trains' %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-light">
+                        Advance trains
+                    </button>
+                </form>
+
+                <form method="post" action="{% url 'snapshot_all_trains' %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-secondary">
+                        Log snapshot now
+                    </button>
+                </form>
+                <a class="btn btn-sm btn-info"
+                    href="{% url 'daily_density_report' %}">
+                    View daily report
+                </a>
             </div>
         </div>
+
+        <div class="card-body">
+            {% if station_rows %}
+            <div class="railway-map">
+                <div class="railway-line"></div>
+                {% for row in station_rows %}
+                    <div class="station-node">
+                        <div class="train-queue">
+                            {% for train in row.queue %}
+                                <div class="train-badge {{ train.capacity_level|lower }}">
+                                    T{{ train.train_id }}
+                                </div>
+                            {% empty %}
+                                <div class="no-trains text-muted small">No trains</div>
+                            {% endfor %}
+                        </div>
+                        <div class="station-circle"></div>
+                        <div class="station-name">
+                            {{ row.station.name }}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            {% else %}
+                <p class="text-muted mb-0">No station data available.</p>
+            {% endif %}
+            <hr class="mt-4">
+
+            <h5>Select a train to view its station and update capacity</h5>
+
+            <form method="get" action="{% url 'home' %}" class="row g-2 align-items-center mb-3">
+            <div class="col-auto">
+                <label for="trainSelect" class="col-form-label">Train:</label>
+            </div>
+            <div class="col-auto">
+                <select id="trainSelect" name="train_id" class="form-select form-select-sm">
+                <option value="">-- choose a train --</option>
+                {% for t in all_trains %}
+                    <option value="{{ t.train_id }}"
+                            {% if selected_train and selected_train.train_id == t.train_id %}selected{% endif %}>
+                    Train {{ t.train_id }}
+                    </option>
+                {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary">Find train</button>
+            </div>
+            </form>
+
+            {% if selected_train %}
+                <div class="alert alert-info py-2">
+                    Train <strong>{{ selected_train.train_id }}</strong>
+                    is currently at
+                    <strong>
+                    {% if selected_station %}
+                        {{ selected_station.name }}
+                    {% else %}
+                        no station (in transit / None)
+                    {% endif %}
+                    </strong>.
+                    &nbsp;Current load:
+                    <strong>{{ selected_train.current_capacity }} / {{ selected_train.max_capacity }}</strong>
+                    (Current density: <strong>{{ selected_train.capacity_level }}</strong>)
+                </div>
+            <!-- Capacity update form for the selected train -->
+            <form method="post" action="{% url 'update_capacity' selected_train.id %}" class="row g-2 align-items-center mb-3">
+                {% csrf_token %}
+                <div class="col-auto">
+                <label for="capacityInput" class="col-form-label">Passenger count:</label>
+                </div>
+                <div class="col-auto">
+                <input id="capacityInput"
+                        type="number"
+                        name="current_capacity"
+                        min="0"
+                        value="{{ selected_train.current_capacity }}"
+                        class="form-control form-control-sm"
+                        style="max-width: 120px;">
+                </div>
+                <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-success">Save capacity</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+      </div>
     </div>
 
-    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script>
+        // Auto-advance every 5 seconds
+        //setInterval(function () {
+            //const form = document.createElement("form");
+            //form.method = "POST";
+            //form.action = "{% url 'advance_trains' %}";
+            //form.style.display = "none";
+
+            //const csrf = document.createElement("input");
+            //csrf.type = "hidden";
+            //csrf.name = "csrfmiddlewaretoken";
+            //csrf.value = "{{ csrf_token }}";
+            //form.appendChild(csrf);
+
+            //document.body.appendChild(form);
+            //form.submit();
+        // }, 5000);
+    </script>
   </body>
 </html>
