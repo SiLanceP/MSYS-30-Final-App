@@ -72,25 +72,43 @@ def home(request):
 
 @require_POST
 def advance_trains(request):
-    stations = list(Station.objects.order_by('order'))
+    # You can add rail-yard exclusion around this later if you want;
+    # for now we keep your existing station ordering.
+    stations = list(Station.objects.order_by("order"))
     if not stations:
-        return redirect('home')
+        return redirect("home")
 
     now = timezone.now()
 
     # Work from last station backwards so we don't move a train twice
     for i in range(len(stations) - 1, -1, -1):
         station = stations[i]
-        queue = list(Train.objects.filter(current_station=station).order_by('last_updated'))
-        if not queue:
+
+        # 1) Build a Queue + hash table for trains at this station
+        trains_qs = Train.objects.filter(current_station=station).order_by("last_updated")
+        if not trains_qs.exists():
             continue
 
-        front = queue[0]  # FIFO: first in line leaves this station
+        station_queue = Queue()
+        table = TrainHashTable()
+        table.build_from_queryset(trains_qs)  # train_id -> Train
 
-        # 1) Randomize passenger capacity (0 .. max_capacity)
+        for t in trains_qs:
+            station_queue.push(t.train_id)    # enqueue in FIFO order
+
+        if station_queue.is_empty():
+            continue
+
+        # 2) Pop the front of the queue (FIFO)
+        front_id = station_queue.pop()
+        front = table.get(front_id)          # O(1) hash table lookup
+        if front is None:
+            continue  # safety guard
+
+        # 3) Randomize passenger capacity (0 .. max_capacity)
         front.current_capacity = random.randint(0, front.max_capacity)
 
-        # 2) Move to next station or remove from line at the last station
+        # 4) Move to next station or remove from line at the last station
         if i == len(stations) - 1:
             # Last station: train leaves the line (no next station)
             front.current_station = None
@@ -98,10 +116,10 @@ def advance_trains(request):
             next_station = stations[i + 1]
             front.current_station = next_station
 
-        # 3) Update timestamp for queue ordering
+        # 5) Update timestamp for queue ordering
         front.last_updated = now
 
-        # 4) Save — your train.save() override will log this change
+        # 6) Save — your train.save() override will log this change
         front.save()
 
     return redirect("home")
