@@ -27,5 +27,4 @@ urlpatterns = [
     path("report/daily/", views.daily_density_report, name="daily_density_report"),
     path("report/daily/excel/", views.daily_density_report_excel, name="daily_density_report_excel"),
     path("report/daily/clear/", views.clear_daily_report, name="clear_daily_report"),
-    path("snapshot/", views.snapshot_all_trains, name="snapshot_all_trains"),
 ]

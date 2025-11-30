@@ -121,13 +121,6 @@
                         Advance trains
                     </button>
                 </form>
-
-                <form method="post" action="{% url 'snapshot_all_trains' %}">
-                    {% csrf_token %}
-                    <button class="btn btn-sm btn-secondary">
-                        Log snapshot now
-                    </button>
-                </form>
                 <a class="btn btn-sm btn-info"
                     href="{% url 'daily_density_report' %}">
                     View daily report

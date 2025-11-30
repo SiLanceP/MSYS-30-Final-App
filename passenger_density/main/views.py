@@ -500,32 +500,6 @@ def daily_density_report_excel(request):
     return resp
 
 @require_POST
-def snapshot_all_trains(request):
-    """
-    Take a snapshot of ALL trains' current capacity and density,
-    logging one Historicalrecord per train (optionally only at last station).
-    """
-    last_station = Station.objects.order_by("order").last()
-    now = timezone.now()
-
-    # If you want ALL trains regardless of station, use Train.objects.all()
-    trains = Train.objects.all()
-
-    for t in trains:
-        # If you want to restrict to last station only, uncomment:
-        # if last_station and t.current_station != last_station:
-        #     continue
-
-        Historicalrecord.objects.create(
-            train=t,
-            station=t.current_station if t.current_station else last_station,
-            timestamp=now,
-            passenger_count=t.current_capacity,
-            capacity_level=t.capacity_level,
-        )
-
-    return redirect("daily_density_report")
-@require_POST
 def clear_daily_report(request):
     """
     Delete all Historicalrecord rows for the selected date.
