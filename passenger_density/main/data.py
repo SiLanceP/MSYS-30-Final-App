@@ -108,3 +108,15 @@ def linear_search(data_list, search_term, attribute_func):
             results.append(item)
             
     return results
+
+class TrainHashTable:
+    def __init__(self):
+        self.table = {}
+
+    def build_from_queryset(self, trains):
+        self.table = {}
+        for t in trains:
+            self.table[t.train_id] = t  # store the actual Train instance
+
+    def get(self, train_id):
+        return self.table.get(train_id)

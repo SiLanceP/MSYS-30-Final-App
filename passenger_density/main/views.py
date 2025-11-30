@@ -9,7 +9,7 @@ import datetime
 import numpy as np
 import pandas as pd
 from .models import Account, Station, train as Train, Historicalrecord
-from .data import TrainNode, Queue, merge_sort, merge, linear_search
+from .data import TrainNode, Queue, merge_sort, merge, linear_search, TrainHashTable
 import random
 
 # Create your views here.
@@ -245,7 +245,6 @@ def daily_density_report(request):
 
     trains_by_high = merge_sort(train_stats, lambda s: s["high_count"])
     trains_by_low = merge_sort(train_stats, lambda s: s["low_count"])
-
     context = {
         "target_date": target_date,
         "trains": trains,
@@ -255,9 +254,61 @@ def daily_density_report(request):
         "trains_by_low": trains_by_low,
         "sort_mode": sort_mode,        # <- used by the buttons
     }
+    # --- C1) Highest passenger capacity per train (max peaks, using linear_search) ---
+    per_train_peaks = []
+    for t in trains:
+        t_logs = [log for log in logs if log.train.train_id == t.train_id]
+        if not t_logs:
+            continue
+
+        max_capacity = max(log.passenger_count for log in t_logs)
+
+        def attr_func(log):
+            return str(log.passenger_count)
+
+        max_logs = linear_search(t_logs, str(max_capacity), attr_func)
+        max_logs.sort(key=lambda log: log.timestamp)
+
+        per_train_peaks.append({
+            "train": t,
+            "max_capacity": max_capacity,
+            "logs": max_logs,
+        })
+
+    # --- C2) Lowest passenger capacity per train (min peaks, using linear_search) ---
+    per_train_min_peaks = []
+    for t in trains:
+        t_logs = [log for log in logs if log.train.train_id == t.train_id]
+        if not t_logs:
+            continue
+
+        # exclude 0 if you want only real passenger counts;
+        # change > 0 to >= 0 if you want to include zeros.
+        non_empty_logs = [log for log in t_logs if log.passenger_count > 0]
+        if not non_empty_logs:
+            continue
+
+        min_capacity = min(log.passenger_count for log in non_empty_logs)
+
+        def min_attr_func(log):
+            return str(log.passenger_count)
+
+        min_logs = linear_search(non_empty_logs, str(min_capacity), min_attr_func)
+        min_logs.sort(key=lambda log: log.timestamp)
+
+        per_train_min_peaks.append({
+            "train": t,
+            "min_capacity": min_capacity,
+            "logs": min_logs,
+        })
+
+    context["per_train_peaks"] = per_train_peaks
+    context["per_train_min_peaks"] = per_train_min_peaks
+
     return render(request, "passenger_density/daily_report.html", context)
 
 def daily_density_report_excel(request):
+    # Same inputs as the HTML view
     date_str = request.GET.get("date")
     if date_str:
         try:
@@ -267,23 +318,177 @@ def daily_density_report_excel(request):
     else:
         target_date = timezone.localdate()
 
+    sort_mode = request.GET.get("sort", "time")  # only affects HTML view; here we export all modes
+
     core = _build_daily_report_data(target_date)
+    logs = core["logs"]
     trains = core["trains"]
     rows = core["rows"]
 
-    # Build a DataFrame: index = times, columns = Train N
+    # ---------- 1) Time grid (what you see at the top of the page) ----------
     index = [row["label"] for row in rows]
-    data = {}
+    grid_data = {}
     for col_idx, t in enumerate(trains):
         col_name = f"Train {t.train_id}"
-        data[col_name] = [row["cells"][col_idx] for row in rows]
+        grid_data[col_name] = [row["cells"][col_idx] for row in rows]
+    df_grid = pd.DataFrame(grid_data, index=index)
+    df_grid.index.name = "Time"
 
-    df = pd.DataFrame(data, index=index)
-    df.index.name = "Time"
+    # ---------- 2) Per-train events list (three variants) ----------
+    events_time_rows = []
+    events_high_rows = []
+    events_low_rows = []
 
+    for t in trains:
+        t_logs = [log for log in logs if log.train.train_id == t.train_id]
+        if not t_logs:
+            continue
+
+        # a) time order (as logged)
+        for log in t_logs:
+            events_time_rows.append({
+                "Train": f"Train {t.train_id}",
+                "Time": timezone.localtime(log.timestamp).strftime("%Y-%m-%d %I:%M %p"),
+                "Station": log.station.name,
+                "Passengers": log.passenger_count,
+                "Density": log.capacity_level,
+            })
+
+        # b) sort High -> Low, then capacity (using merge_sort)
+        def key_func(log):
+            level = log.capacity_level.lower()
+            score = DENSITY_SCORE.get(level, 0)
+            return (score, log.passenger_count)
+
+        high_sorted = merge_sort(t_logs, key_func)          # highest score first
+        low_sorted = list(reversed(high_sorted))            # Lowest → Highest
+
+        for log in high_sorted:
+            events_high_rows.append({
+                "Train": f"Train {t.train_id}",
+                "Time": timezone.localtime(log.timestamp).strftime("%Y-%m-%d %I:%M %p"),
+                "Station": log.station.name,
+                "Passengers": log.passenger_count,
+                "Density": log.capacity_level,
+            })
+
+        for log in low_sorted:
+            events_low_rows.append({
+                "Train": f"Train {t.train_id}",
+                "Time": timezone.localtime(log.timestamp).strftime("%Y-%m-%d %I:%M %p"),
+                "Station": log.station.name,
+                "Passengers": log.passenger_count,
+                "Density": log.capacity_level,
+            })
+
+    df_events_time = pd.DataFrame(events_time_rows)
+    df_events_high = pd.DataFrame(events_high_rows)
+    df_events_low = pd.DataFrame(events_low_rows)
+
+    # ---------- 3) Rankings by High / Low peaks (separate sheets) ----------
+    stats_rows = []
+    for t in trains:
+        t_logs = [log for log in logs if log.train.train_id == t.train_id]
+        if not t_logs:
+            continue
+        high_count = sum(1 for log in t_logs if log.capacity_level.lower() == "high")
+        low_count = sum(1 for log in t_logs if log.capacity_level.lower() == "low")
+        stats_rows.append({
+            "Train": f"Train {t.train_id}",
+            "High peaks": high_count,
+            "Low periods": low_count,
+        })
+
+    stats_by_high = merge_sort(stats_rows, lambda s: s["High peaks"])
+    stats_by_low = merge_sort(stats_rows, lambda s: s["Low periods"])
+
+    df_rank_high = pd.DataFrame(
+        [{"Train": s["Train"], "High peaks": s["High peaks"]} for s in stats_by_high]
+    )
+    df_rank_low = pd.DataFrame(
+        [{"Train": s["Train"], "Low periods": s["Low periods"]} for s in stats_by_low]
+    )
+
+    # ---------- 4) Peaks per train: Max and Min (using linear_search) ----------
+    peaks_max_rows = []
+    peaks_min_rows = []
+
+    for t in trains:
+        t_logs = [log for log in logs if log.train.train_id == t.train_id]
+        if not t_logs:
+            continue
+
+        # Ignore completely empty logs for min/max if you want only real passenger counts.
+        # If you want to include 0, remove this filter.
+        non_empty_logs = [log for log in t_logs if log.passenger_count > 0]
+        if not non_empty_logs:
+            continue
+
+        # Max capacity
+        max_capacity = max(log.passenger_count for log in non_empty_logs)
+        # Min capacity (lowest nonzero peak)
+        min_capacity = min(log.passenger_count for log in non_empty_logs)
+
+        def attr_func(log):
+            return str(log.passenger_count)
+
+        # Max peaks
+        max_logs = linear_search(non_empty_logs, str(max_capacity), attr_func)
+        max_logs.sort(key=lambda log: log.timestamp)
+
+        max_times_str = "; ".join(
+            f"{timezone.localtime(log.timestamp).strftime('%I:%M %p').lstrip('0')} "
+            f"({log.station.name}, {log.capacity_level})"
+            for log in max_logs
+        )
+
+        peaks_max_rows.append({
+            "Train": f"Train {t.train_id}",
+            "Max passengers": max_capacity,
+            "Time(s)": max_times_str,
+        })
+
+        # Min peaks
+        min_logs = linear_search(non_empty_logs, str(min_capacity), attr_func)
+        min_logs.sort(key=lambda log: log.timestamp)
+
+        min_times_str = "; ".join(
+            f"{timezone.localtime(log.timestamp).strftime('%I:%M %p').lstrip('0')} "
+            f"({log.station.name}, {log.capacity_level})"
+            for log in min_logs
+        )
+
+        peaks_min_rows.append({
+            "Train": f"Train {t.train_id}",
+            "Min passengers": min_capacity,
+            "Time(s)": min_times_str,
+        })
+
+    df_peaks_max = pd.DataFrame(peaks_max_rows)
+    df_peaks_min = pd.DataFrame(peaks_min_rows)
+
+    # ---------- Write all to a single Excel file ----------
     output = BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, sheet_name="DailyDensity")
+    with pd.ExcelWriter(output) as writer:
+        df_grid.to_excel(writer, sheet_name="Grid")
+
+        if not df_events_time.empty:
+            df_events_time.to_excel(writer, sheet_name="EventsTime", index=False)
+        if not df_events_high.empty:
+            df_events_high.to_excel(writer, sheet_name="EventsHighToLow", index=False)
+        if not df_events_low.empty:
+            df_events_low.to_excel(writer, sheet_name="EventsLowToHigh", index=False)
+
+        if not df_rank_high.empty:
+            df_rank_high.to_excel(writer, sheet_name="RankHigh", index=False)
+        if not df_rank_low.empty:
+            df_rank_low.to_excel(writer, sheet_name="RankLow", index=False)
+
+        if not df_peaks_max.empty:
+            df_peaks_max.to_excel(writer, sheet_name="PeaksMax", index=False)
+        if not df_peaks_min.empty:
+            df_peaks_min.to_excel(writer, sheet_name="PeaksMin", index=False)
+
     output.seek(0)
 
     filename = f"density_{target_date}.xlsx"
@@ -291,7 +496,7 @@ def daily_density_report_excel(request):
         output.read(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    resp["Content-Disposition"] = f'attachment; filename=\"{filename}\"'
     return resp
 
 @require_POST
@@ -342,68 +547,47 @@ def clear_daily_report(request):
     # Redirect back to the report page for that same date
     return redirect(f"{reverse('daily_density_report')}?date={target_date.isoformat()}")
 
-def simulate_queue(request):
-    if request.method == 'POST':
-        station_name = request.POST.get('station')
-        station = get_object_or_404(Station, name=station_name)
-
-        # Initialize Queue
-        train_queue = Queue()
-
-        # Enqueue trains currently at the station
-        trains_at_station = Train.objects.filter(current_station=station).order_by('last_updated')
-        for train in trains_at_station:
-            train_queue.push(train.train_id)
-
-        # Dequeue trains to simulate processing
-        processed_trains = []
-        while not train_queue.is_empty():
-            train_id = train_queue.pop()
-            processed_trains.append(train_id)
-
-        context = {
-            'station': station,
-            'processed_trains': processed_trains,
-        }
-        return render(request, 'passenger_density/simulation_result.html', context)
-    else:
-        return redirect('home')
-# -- 2. Search Train (Linear Search) ---
 def search_train(request):
     search_result = None
     search_message = None
-    
-    # 1. Fetch all trains (needed for the Dropdown AND the Search)
-    all_trains = list(Train.objects.all())
 
-    # 2. Check if the user picked something from the dropdown
-    query = request.GET.get('train_id') 
+    # Build hash table of all trains
+    all_trains_qs = Train.objects.all().order_by("train_id")
+    all_trains = list(all_trains_qs)
 
+    table = TrainHashTable()
+    table.build_from_queryset(all_trains)
+
+    query = request.GET.get("train_id")
+
+    selected_train = None
     if query:
-        # 3. Define the attribute function for linear search
-        # We look for an exact match on the Train ID
-        get_id_func = lambda t: str(t.train_id)
+        try:
+            q_id = int(query)
+        except ValueError:
+            q_id = None
 
-        # 4. Perform Linear Search using your custom function
-        matches = linear_search(all_trains, query, get_id_func)
+        if q_id is not None:
+            selected_train = table.get(q_id)  # O(1) hash table lookup
 
-        if matches:
-            found_train = matches[0]
-            
-            # Check if the train is currently assigned to a station
-            if found_train.current_station:
-                search_result = f"Train {found_train.train_id} ({found_train.name}) is currently at {found_train.current_station.name}."
-            else:
-                search_result = f"Train {found_train.train_id} ({found_train.name}) is currently in transit/inactive (not at any station)."
+    if selected_train:
+        if selected_train.current_station:
+            search_result = (
+                f"Train {selected_train.train_id} is currently at "
+                f"{selected_train.current_station.name}."
+            )
         else:
-            # This handles the rare case where the ID in the dropdown 
-            # might have been deleted from the DB between loading and clicking
-            search_message = "Error: Selected train could not be found."
+            search_result = (
+                f"Train {selected_train.train_id} is currently in transit/inactive "
+                f"(not at any station)."
+            )
+    elif query:
+        search_message = "Train not found."
 
     context = {
-        'trains': all_trains, # Pass the list to populate the dropdown
-        'search_result': search_result,
-        'search_message': search_message,
-        'selected_train': query # To keep the dropdown selected on the current choice
+        "trains": all_trains,
+        "search_result": search_result,
+        "search_message": search_message,
+        "selected_train": query,
     }
-    return render(request, 'passenger_density/search_train.html', context)
+    return render(request, "passenger_density/search_train.html", context)

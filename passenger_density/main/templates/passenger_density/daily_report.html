@@ -156,6 +156,61 @@
       </div>
     </div>
 
+    <h4 class="mt-4">Highest passenger capacity per train (using linear search)</h4>
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+            <th>Train</th>
+            <th>Max passengers</th>
+            <th>Time(s)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in per_train_peaks %}
+            <tr>
+                <td>Train {{ item.train.train_id }}</td>
+                <td>{{ item.max_capacity }}</td>
+                <td>
+                {% for log in item.logs %}
+                    {{ log.timestamp|date:"g:i A" }} ({{ log.station.name }}, {{ log.capacity_level|capfirst }}){% if not forloop.last %}; {% endif %}
+                {% endfor %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3" class="text-muted">No data for this date.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h4 class="mt-4">Lowest passenger capacity per train (using linear search)</h4>
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+            <th>Train</th>
+            <th>Min passengers</th>
+            <th>Time(s)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in per_train_min_peaks %}
+            <tr>
+                <td>Train {{ item.train.train_id }}</td>
+                <td>{{ item.min_capacity }}</td>
+                <td>
+                {% for log in item.logs %}
+                    {{ log.timestamp|date:"g:i A" }} ({{ log.station.name }}, {{ log.capacity_level|capfirst }}){% if not forloop.last %}; {% endif %}
+                {% endfor %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3" class="text-muted">No data for this date.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
   </body>
 </html>
