@@ -9,7 +9,7 @@
   </head>
   <body class="bg-light">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="mb-0">Daily density report – {{ target_date }}</h2>
+        <h2 class="mb-0">Daily density report for {{ target_date }}</h2>
         <div class="d-flex gap-2">
             <a class="btn btn-sm btn-success"
                 href="{% url 'daily_density_report_excel' %}?date={{ target_date|date:'Y-m-d' }}">
@@ -75,7 +75,7 @@
       </div>
 
       <!-- Per-train events sorted from high -> low -->
-      <h4>Density events per train (sorted {{ sort_mode|capfirst }}{% if sort_mode == 'high' %} (High → Low){% elif sort_mode == 'low' %} (Low → High){% else %} by time{% endif %})</h4>
+      <h4>Density events per train (sorted {{ sort_mode|capfirst }}{% if sort_mode == 'high' %} (High -> Low){% elif sort_mode == 'low' %} (Low -> High){% else %} by time{% endif %})</h4>
 
       <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Sort density events">
         <a class="btn btn-outline-primary {% if sort_mode == 'time' %}active{% endif %}"
@@ -170,7 +170,7 @@
       </div>
     </div>
 
-    <h4 class="mt-4">Highest passenger capacity per train (using linear search)</h4>
+    <h4 class="mt-4">Highest passenger capacity per train</h4>
     <table class="table table-sm table-striped align-middle">
         <thead>
             <tr>
@@ -198,7 +198,7 @@
         </tbody>
     </table>
 
-    <h4 class="mt-4">Lowest passenger capacity per train (using linear search)</h4>
+    <h4 class="mt-4">Lowest passenger capacity per train</h4>
     <table class="table table-sm table-striped align-middle">
         <thead>
             <tr>

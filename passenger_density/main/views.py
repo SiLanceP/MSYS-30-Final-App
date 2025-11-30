@@ -72,8 +72,6 @@ def home(request):
 
 @require_POST
 def advance_trains(request):
-    # You can add rail-yard exclusion around this later if you want;
-    # for now we keep your existing station ordering.
     stations = list(Station.objects.order_by("order"))
     if not stations:
         return redirect("home")

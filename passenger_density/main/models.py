@@ -45,10 +45,7 @@ class train(models.Model):
             return "Low"
 
     def save(self, *args, **kwargs):
-        """
-        Log a Historicalrecord whenever passenger capacity (and thus density)
-        changes for this train, at whatever station it is currently at.
-        """
+
         # ensure capacity is within bounds (no negative or over max)
         if self.current_capacity < 0:
             self.current_capacity = 0
