@@ -84,7 +84,7 @@ def advance_trains(request):
 
     now = timezone.now()
     # Process them in Westbound Order (Antipolo to Recto)
-    for i in range(len(stations) - 1, -1, -1):
+    for i in range(len(stations) - 1, -1, -1): #change to range(len(stations)) for Recto to Antipolo
         station = stations[i]
 
         # 1) uses Queue and hash table for trains at this station
@@ -112,24 +112,22 @@ def advance_trains(request):
         front.current_capacity = random.randint(0, front.max_capacity)
 
         # 4) Move to next station or remove from line at the last station
-        if i == len(stations) - 1:
+        if i == len(stations) - 1: #change to 0 for Recto to Antipolo
             # Last station: train leaves the line (no next station)
             front.current_station = None
         else:
-            next_station = stations[i + 1]
+            next_station = stations[i + 1] #change to stations[i - 1] for Recto to Antipolo
             front.current_station = next_station
 
-        # 5) Update timestamp for queue ordering
+        # 5) Update timestamp 
         front.last_updated = now
-
-        # 6) Save — your train.save() override will log this change
         front.save()
 
     return redirect("home")
 
 @require_POST
 def reset_trains_to_start(request):
-    first_station = Station.objects.order_by('order').first()
+    first_station = Station.objects.order_by('order').first() #change this to .last() for Recto to Antipolo
     if not first_station:
         return redirect('home')  # nothing to do if no stations
 
