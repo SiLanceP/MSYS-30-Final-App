@@ -236,7 +236,17 @@ def daily_density_report(request):
         if not t_logs:
             continue
 
-        if sort_mode in ("high", "low"):
+        if sort_mode == 'station':
+            #sort staion name by order
+            def key_func(log): #extract the station order
+                return log.station.order
+            #Antipolo to Recto
+            station_logs = merge_sort(t_logs, key_func)
+            #Recto to Antipolo
+            sorted_logs = list(reversed(station_logs))
+            
+
+        elif sort_mode in ("high", "low"):
             # Use merge_sort to sort by density score, then passenger_count
             def key_func(log):
                 level = log.capacity_level.lower()

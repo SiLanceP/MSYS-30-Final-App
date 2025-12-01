@@ -75,7 +75,7 @@
       </div>
 
       <!-- Per-train events sorted -->
-      <h4>Density events per train {% if sort_mode == 'high' %} (High -> Low){% elif sort_mode == 'low' %} (Low -> High){% else %}{% endif %}</h4>
+      <h4>Density events per train {% if sort_mode == 'high' %} (High -> Low){% elif sort_mode == 'low' %}(Low -> High){% elif sort_mode == 'station' %} Sort By Station Order {% else %}{% endif %}</h4>
 
       <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Sort density events">
         <a class="btn btn-outline-primary {% if sort_mode == 'time' %}active{% endif %}"
@@ -89,6 +89,10 @@
         <a class="btn btn-outline-primary {% if sort_mode == 'low' %}active{% endif %}"
           href="{% url 'daily_density_report' %}?date={{ target_date|date:'Y-m-d' }}&sort=low">
           Lowest to Highest
+        </a>
+        <a class="btn btn-outline-primary {% if sort_mode == 'station' %}active{% endif %}"
+           href="{% url 'daily_density_report' %}?date={{ target_date|date:'Y-m-d' }}&sort=station">
+           Sort by Station
         </a>
       </div>
 
