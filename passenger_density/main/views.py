@@ -78,7 +78,6 @@ def advance_trains(request):
 
     now = timezone.now()
 
-    # Work from last station backwards so we don't move a train twice
     for i in range(len(stations) - 1, -1, -1):
         station = stations[i]
 
@@ -103,7 +102,7 @@ def advance_trains(request):
         if front is None:
             continue  # safety guard
 
-        # 3) Randomize passenger capacity (0 .. max_capacity)
+        # 3) Randomize passenger capacity once it passes a station
         front.current_capacity = random.randint(0, front.max_capacity)
 
         # 4) Move to next station or remove from line at the last station
@@ -169,7 +168,10 @@ def _build_daily_report_data(target_date):
     logs = list(qs)
 
     # Which trains appear in the logs?
-    train_ids = sorted({log.train.train_id for log in logs})
+    id_lists = list({log.train.train_id for log in logs})
+    #Merge sort the train IDs
+    descending = merge_sort(id_lists, lambda x: x) # merge sort the train IDs
+    train_ids = list(reversed(descending)) # mdae them ascending (1 - 5)
     trains = list(Train.objects.filter(train_id__in=train_ids).order_by("train_id"))
 
     # Time slots 4:00–22:00
@@ -185,9 +187,10 @@ def _build_daily_report_data(target_date):
         hour = local_ts.hour
         if hour < start_hour or hour > end_hour:
             continue
-        grid[hour][log.train.train_id] = log.capacity_level.lower()
+        if log.train.train_id in grid[hour]:
+            grid[hour][log.train.train_id] = log.capacity_level.lower()
 
-    # Build rows for template (same structure as before)
+    # Build rows for display
     rows = []
     for hour in hours:
         # Use 12-hour format like "6:00 AM"

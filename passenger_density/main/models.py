@@ -73,7 +73,7 @@ class train(models.Model):
         if not self.current_station:
             return
 
-        # Decide if something relevant changed
+        # if something changed
         capacity_changed = (old_capacity is None) or (self.current_capacity != old_capacity)
         level_changed = (old_level is None) or (self.capacity_level != old_level)
         station_changed = (old_station is None) or (self.current_station != old_station)
