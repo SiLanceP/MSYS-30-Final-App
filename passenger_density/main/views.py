@@ -34,9 +34,9 @@ def get_density(train):
     else:
         return 'low'    # Green
     
-# --- 1. SIMULATION VIEW (Queue Logic + Time Calculation) ---
+# --- 1. SIMULATION VIEW (Queue) ---
 def home(request):
-    # 1. Stations ordered like the railway map
+    # Stations ordered
     stations = Station.objects.order_by("order")
 
     station_rows = []
@@ -47,10 +47,15 @@ def home(request):
             "queue": list(queue),
         })
 
-    # 2. All trains for dropdown
+    # All trains for dropdown
     all_trains = list(Train.objects.all().order_by("train_id"))
 
-    # 3. Use linear_search to find the selected train (if any)
+    # Hash Table to get all trains
+    ht = TrainHashTable()
+    ht.build_from_queryset(all_trains)
+    hash_table_trains = list(ht.table.values())
+
+    # Use linear_search to find the selected train
     selected_train = None
     selected_station = None
 
@@ -67,6 +72,7 @@ def home(request):
         "all_trains": all_trains,
         "selected_train": selected_train,
         "selected_station": selected_station,
+        "hash_table_trains": hash_table_trains,
     }
     return render(request, "passenger_density/home.html", context)
 
@@ -77,11 +83,11 @@ def advance_trains(request):
         return redirect("home")
 
     now = timezone.now()
-
+    # Process them in Westbound Order (Antipolo to Recto)
     for i in range(len(stations) - 1, -1, -1):
         station = stations[i]
 
-        # 1) Build a Queue + hash table for trains at this station
+        # 1) uses Queue and hash table for trains at this station
         trains_qs = Train.objects.filter(current_station=station).order_by("last_updated")
         if not trains_qs.exists():
             continue
@@ -91,16 +97,16 @@ def advance_trains(request):
         table.build_from_queryset(trains_qs)  # train_id -> Train
 
         for t in trains_qs:
-            station_queue.push(t.train_id)    # enqueue in FIFO order
+            station_queue.push(t.train_id)    # enqueue in First-in First-Out order
 
         if station_queue.is_empty():
             continue
 
         # 2) Pop the front of the queue (FIFO)
         front_id = station_queue.pop()
-        front = table.get(front_id)          # O(1) hash table lookup
+        front = table.get(front_id)          # hash table lookup
         if front is None:
-            continue  # safety guard
+            continue  
 
         # 3) Randomize passenger capacity once it passes a station
         front.current_capacity = random.randint(0, front.max_capacity)
