@@ -137,8 +137,7 @@ def reset_trains_to_start(request):
 
     for idx, t in enumerate(trains):
         t.current_station = first_station
-        t.current_capacity = 0          # <<< reset passenger count here
-        # Stagger last_updated slightly so FIFO is clear
+        t.current_capacity = 0          # reset passenger count here
         t.last_updated = now + datetime.timedelta(seconds=idx)
         t.save()
 
@@ -157,7 +156,7 @@ def update_capacity(request, train_id):
         new_capacity = 0
 
     train.current_capacity = new_capacity
-    train.save(update_fields=["current_capacity"])  # triggers your save() hook
+    train.save(update_fields=["current_capacity"])
 
     return redirect("home")
 
@@ -165,7 +164,6 @@ DENSITY_SCORE = {"empty": 0, "low": 1, "medium": 2, "high": 3}
 
 def _build_daily_report_data(target_date):
     """Core data for the daily density report."""
-    # Only consider logs at the last station
     qs = Historicalrecord.objects.select_related("train", "station") \
                                 .filter(timestamp__date=target_date) \
                                 .order_by("timestamp")
@@ -175,7 +173,7 @@ def _build_daily_report_data(target_date):
     id_lists = list({log.train.train_id for log in logs})
     #Merge sort the train IDs
     descending = merge_sort(id_lists, lambda x: x) # merge sort the train IDs
-    train_ids = list(reversed(descending)) # mdae them ascending (1 - 5)
+    train_ids = list(reversed(descending)) # made them ascending from 5-1 to 1 - 5
     trains = list(Train.objects.filter(train_id__in=train_ids).order_by("train_id"))
 
     # Time slots 4:00–22:00
@@ -183,8 +181,8 @@ def _build_daily_report_data(target_date):
     end_hour = 22
     hours = list(range(start_hour, end_hour + 1))
 
-    # grid[hour][train_id] = 'low' / 'medium' / 'high' / ''
-    grid = {hour: {t.train_id: "" for t in trains} for hour in hours}
+    # grid[hour][train_id] = 'low' / 'medium' / 'high' / 'empty' 
+    grid = {hour: {t.train_id: "" for t in trains} for hour in hours} # initialize the grid
 
     for log in logs:
         local_ts = timezone.localtime(log.timestamp)
@@ -197,7 +195,7 @@ def _build_daily_report_data(target_date):
     # Build rows for display
     rows = []
     for hour in hours:
-        # Use 12-hour format like "6:00 AM"
+        # Use 12-hour format
         label_time = datetime.time(hour=hour)
         label = label_time.strftime("%I:00 %p").lstrip("0")
         cells = [grid[hour][t.train_id] for t in trains]
@@ -230,7 +228,7 @@ def daily_density_report(request):
     trains = core["trains"]
     rows = core["rows"]
 
-    # --- A) Per-train events sorted according to sort_mode ---
+    # A) Per-train events sorted using merge sort
     per_train_sorted = []
     for t in trains:
         # logs are already ordered by timestamp in _build_daily_report_data
@@ -254,7 +252,7 @@ def daily_density_report(request):
 
         per_train_sorted.append({"train": t, "logs": sorted_logs})
 
-    # --- B) Train rankings by number of High / Low peaks (unchanged) ---
+    #  B) Train rankings by number of High / Low peaks
     train_stats = []
     for t in trains:
         t_logs = [log for log in logs if log.train.train_id == t.train_id]
@@ -268,16 +266,8 @@ def daily_density_report(request):
 
     trains_by_high = merge_sort(train_stats, lambda s: s["high_count"])
     trains_by_low = merge_sort(train_stats, lambda s: s["low_count"])
-    context = {
-        "target_date": target_date,
-        "trains": trains,
-        "rows": rows,                  # time-sorted grid
-        "per_train_sorted": per_train_sorted,
-        "trains_by_high": trains_by_high,
-        "trains_by_low": trains_by_low,
-        "sort_mode": sort_mode,        # <- used by the buttons
-    }
-    # --- C1) Highest passenger capacity per train (max peaks, using linear_search) ---
+    
+    # C1) Highest passenger capacity per train (using linear search)
     per_train_peaks = []
     for t in trains:
         t_logs = [log for log in logs if log.train.train_id == t.train_id]
@@ -298,15 +288,13 @@ def daily_density_report(request):
             "logs": max_logs,
         })
 
-    # --- C2) Lowest passenger capacity per train (min peaks, using linear_search) ---
+    # C2) Lowest passenger capacity per train (using linear search)
     per_train_min_peaks = []
     for t in trains:
         t_logs = [log for log in logs if log.train.train_id == t.train_id]
         if not t_logs:
             continue
 
-        # exclude 0 if you want only real passenger counts;
-        # change > 0 to >= 0 if you want to include zeros.
         non_empty_logs = [log for log in t_logs if log.passenger_count > 0]
         if not non_empty_logs:
             continue
@@ -324,14 +312,22 @@ def daily_density_report(request):
             "min_capacity": min_capacity,
             "logs": min_logs,
         })
-
-    context["per_train_peaks"] = per_train_peaks
-    context["per_train_min_peaks"] = per_train_min_peaks
+    
+    context = {
+        "target_date": target_date,
+        "trains": trains,
+        "rows": rows,                  # time-sorted grid
+        "per_train_sorted": per_train_sorted,
+        "trains_by_high": trains_by_high,
+        "trains_by_low": trains_by_low,
+        "sort_mode": sort_mode,
+        "per_train_peaks": per_train_peaks,
+        "per_train_min_peaks": per_train_min_peaks,        # <- used by the buttons
+    }
 
     return render(request, "passenger_density/daily_report.html", context)
 
 def daily_density_report_excel(request):
-    # Same inputs as the HTML view
     date_str = request.GET.get("date")
     if date_str:
         try:
@@ -341,14 +337,14 @@ def daily_density_report_excel(request):
     else:
         target_date = timezone.localdate()
 
-    sort_mode = request.GET.get("sort", "time")  # only affects HTML view; here we export all modes
+    sort_mode = request.GET.get("sort", "time")  
 
     core = _build_daily_report_data(target_date)
     logs = core["logs"]
     trains = core["trains"]
     rows = core["rows"]
 
-    # ---------- 1) Time grid (what you see at the top of the page) ----------
+    # 1) Time grid
     index = [row["label"] for row in rows]
     grid_data = {}
     for col_idx, t in enumerate(trains):
@@ -357,7 +353,7 @@ def daily_density_report_excel(request):
     df_grid = pd.DataFrame(grid_data, index=index)
     df_grid.index.name = "Time"
 
-    # ---------- 2) Per-train events list (three variants) ----------
+    # 2) Per-train events list
     events_time_rows = []
     events_high_rows = []
     events_low_rows = []
@@ -367,7 +363,7 @@ def daily_density_report_excel(request):
         if not t_logs:
             continue
 
-        # a) time order (as logged)
+        # a) time order
         for log in t_logs:
             events_time_rows.append({
                 "Train": f"Train {t.train_id}",
@@ -377,7 +373,7 @@ def daily_density_report_excel(request):
                 "Density": log.capacity_level,
             })
 
-        # b) sort High -> Low, then capacity (using merge_sort)
+        # b) sorts them High to Low, then shows capacity (using merge sort)
         def key_func(log):
             level = log.capacity_level.lower()
             score = DENSITY_SCORE.get(level, 0)
@@ -408,7 +404,7 @@ def daily_density_report_excel(request):
     df_events_high = pd.DataFrame(events_high_rows)
     df_events_low = pd.DataFrame(events_low_rows)
 
-    # ---------- 3) Rankings by High / Low peaks (separate sheets) ----------
+    # 3) Rankings by High / Low peaks (how many times each train was High / Low)
     stats_rows = []
     for t in trains:
         t_logs = [log for log in logs if log.train.train_id == t.train_id]
@@ -432,7 +428,7 @@ def daily_density_report_excel(request):
         [{"Train": s["Train"], "Low periods": s["Low periods"]} for s in stats_by_low]
     )
 
-    # ---------- 4) Peaks per train: Max and Min (using linear_search) ----------
+    # 4) Peaks per train: Max and Min (using linear search)
     peaks_max_rows = []
     peaks_min_rows = []
 
@@ -441,8 +437,7 @@ def daily_density_report_excel(request):
         if not t_logs:
             continue
 
-        # Ignore completely empty logs for min/max if you want only real passenger counts.
-        # If you want to include 0, remove this filter.
+        # Ignores empty logs for min/max
         non_empty_logs = [log for log in t_logs if log.passenger_count > 0]
         if not non_empty_logs:
             continue
@@ -490,8 +485,8 @@ def daily_density_report_excel(request):
     df_peaks_max = pd.DataFrame(peaks_max_rows)
     df_peaks_min = pd.DataFrame(peaks_min_rows)
 
-    # ---------- Write all to a single Excel file ----------
-    output = BytesIO()
+    # to single Excel file 
+    output = BytesIO() # gives us a file-like object in memory
     with pd.ExcelWriter(output) as writer:
         df_grid.to_excel(writer, sheet_name="Grid")
 
@@ -565,7 +560,7 @@ def search_train(request):
             q_id = None
 
         if q_id is not None:
-            selected_train = table.get(q_id)  # O(1) hash table lookup
+            selected_train = table.get(q_id)
 
     if selected_train:
         if selected_train.current_station:
